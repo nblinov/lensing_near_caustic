@@ -1,4 +1,1 @@
-﻿# This repository contains the research done in the summer of 2024 with Nikita Blinov related to caustic lensing and dark matter minihalos. A report outlining the work can be found in this repo named "Lensing Report"
-
-
-# The technique used to solve the lens equation in this code is influenced by Jorge Jimenez-Vicente's "Tutorial on Inverse Ray Shooting". Furthermore, the code used to model random density fluctuations is also based on the work of Bruno Sciolla's (bsciolla on Github) repo "Gaussian random fields".
+﻿This code can be used to predict the lightcurve of a highly-magnified star in the presence of a random Gaussian noise in the lens due to small-scale dark matter substructure. The macro lens model is that of a fold caustic with convergence perturbations drawn from a power spectrum corresponding to "monochromatic" distribution of dark matter minihalos. This code is based on work with Cristiano Sampaio during the summer of 2024.
