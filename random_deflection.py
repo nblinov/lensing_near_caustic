@@ -2,7 +2,7 @@ import numpy as np
 import power_spectrum as ps
 
 
-def generate_random_field(params):
+def generate_random_field(params, compute_jacobian=False):
     """
     Generates a random Gaussian lensing deflection field using a physical clump power spectrum
     Args:
@@ -11,8 +11,10 @@ def generate_random_field(params):
         num_pixel - number of pixels in the lens plane along one direction 
         area_in_rad_sq - physical area of the lens plane in radians squared
         ps_params - dictionary containing parameters needed to evaluate the power spectrum
+        compute_jacobian - flag to compute Jacobian matrix of the random deflection
     Returns:
         [delta_alpha1,delta_alpha2] - random deflection fluctuations along the two plane directions. Each of the list elements is a (num_pixel,num_pixel) array. Note that the deflections have units of radians, which might differ from the units used in the inverse ray shooting!
+        jacobian - jacobian of the deflections if the compute_jacobian flag is true. The shape of this is (N,N,2,2)
     """
 
 
@@ -39,8 +41,14 @@ def generate_random_field(params):
     # the deflections with units pixel_size (l/l^2) * pixel_size^2 (amplitude) /pixel_size^2 (delta^2) = pixel_size, e.g., rad
     delta_alpha1 = np.fft.ifft2((2 * 1j * ell_freq[0] / np.power(ell_magnitude, 2) ) * noise * amplitude).real/delta**2
     delta_alpha2 = np.fft.ifft2((2 * 1j * ell_freq[1] / np.power(ell_magnitude, 2) ) * noise * amplitude).real/delta**2
-
-    return(np.array([delta_alpha1,delta_alpha2]))
+    if compute_jacobian:
+        j11 = np.fft.ifft2((2 * 1j * ell_freq[0]*ell_freq[0] / np.power(ell_magnitude, 2) ) * noise * amplitude).real/delta**2
+        j12 = np.fft.ifft2((2 * 1j * ell_freq[0]*ell_freq[1] / np.power(ell_magnitude, 2) ) * noise * amplitude).real/delta**2
+        j22 = np.fft.ifft2((2 * 1j * ell_freq[1]*ell_freq[1] / np.power(ell_magnitude, 2) ) * noise * amplitude).real/delta**2
+        jac = np.array([[j11,j12],[j12,j22]])
+        return(np.array([delta_alpha1,delta_alpha2]), np.moveaxis(jac, [0, 1], [2, 3]))
+    else:
+        return(np.array([delta_alpha1,delta_alpha2]))
 
 if __name__ == '__main__':
 

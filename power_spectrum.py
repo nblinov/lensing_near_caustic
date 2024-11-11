@@ -157,7 +157,6 @@ if __name__ == "__main__":
     plt.ylim(float(pkappa[0]), 1e-5)
     plt.xlim(k_rs[0], 1e11)
     plt.axvline(1, color = 'black', ls = '--')
-    plt.axvline(1e6, color = 'black', ls = ':')
     plt.xscale('log')
     plt.yscale('log')
     plt.ylabel(r'$q^2 P_\kappa/(2\pi)$', fontsize = 20)

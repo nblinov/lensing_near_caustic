@@ -15,6 +15,15 @@ def lens_mapping(x1, x2, params):
         y2 += params['random_deflection'][1]
     return y1, y2
 
+def lens_mapping_jacobian(x1, x2, params):
+    """
+    Analytically-computed Jacobian of len_mapping. The returned shape is (len(x1),len(x2),2,2).
+    """
+    p = params
+    jac = np.array([[p['phi_11'] + x1*p['phi_111'] + x2*p['phi_112'], x1*p['phi_112'] + x2*p['phi_122']],
+                     [x1*p['phi_112'] + x2*p['phi_122'], x1*p['phi_122'] + p['phi_22'] + x2*p['phi_222']]])
+    return(np.moveaxis(jac, [0, 1], [2, 3]))
+
 def pixel_to_pos(pixel, origin, pixel_size):
     return origin + pixel * pixel_size
 
