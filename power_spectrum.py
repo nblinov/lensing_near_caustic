@@ -32,10 +32,9 @@ def get_halo_information(M, c):
     Ms = 8.*np.pi*rs**3*rho_s*(np.log(4.) - 1)
     return rs, rMax, rho_s, Ms # [km, km, Solar Masses / km^3, Solar mass]
 
+"""
 def _g_truncated_nfw(x, c, asymptotic_switch=1e5):
-    """
-    A function needed for the Fourier transform of the truncated NFW density profile as a function of x=c*r_s, with the truncation radius at c*r_s
-    """
+    #A function needed for the Fourier transform of the truncated NFW density profile as a function of x=c*r_s, with the truncation radius at c*r_s
 
     if c*x < asymptotic_switch:
         si_x, ci_x = special.sici(x)
@@ -46,6 +45,44 @@ def _g_truncated_nfw(x, c, asymptotic_switch=1e5):
     else:
         return (1.-np.cos(c*x)/(1 + c)**2) / x**2
 g_truncated_nfw = np.vectorize(_g_truncated_nfw)
+"""
+def g_truncated_nfw(x, c, asymptotic_switch=1e5):
+    """
+    Vectorized version of the _g_truncated_nfw function. 
+    """
+    x = np.asarray(x)
+    c = np.asarray(c)
+    
+    cx = c * x
+    condition = cx < asymptotic_switch
+    
+    # Initialize the result array
+    result = np.zeros_like(x, dtype=np.float64)
+    
+    # Compute for condition == True
+    if np.any(condition):
+        x_cond = x[condition]
+        cx_cond = cx[condition]
+        
+        si_x, ci_x = special.sici(x_cond)
+        si_1_plus_cx, ci_1_plus_cx = special.sici((1 + c) * x_cond)
+        
+        term1 = -np.sin(cx_cond) / ((1 + c) * x_cond)
+        term2 = -np.cos(x_cond) * (ci_x - ci_1_plus_cx)
+        term3 = -np.sin(x_cond) * (si_x - si_1_plus_cx)
+        
+        result[condition] = term1 + term2 + term3
+    
+    # Compute for condition == False
+    if np.any(~condition):
+        x_else = x[~condition]
+        cx_else = cx[~condition]
+        
+        term = (1. - np.cos(cx_else) / (1 + c)**2) / x_else**2
+        result[~condition] = term
+    
+    return result
+
 
 def rhoTildeSq(q, M, c):
     """
