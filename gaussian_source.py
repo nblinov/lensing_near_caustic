@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.special import kv, iv
+from scipy.special import kv, iv, gamma
 
 def gaussian_source(y1, y2, rad, c=[0.,0.]):
     """
@@ -21,6 +21,8 @@ def analytic_gaussian_source_magnification(w):
     norm = np.pi / 2.
     if w > 0:
         return 0.5 * np.sqrt(w * np.pi / 2.) * np.exp(-0.5 * w ** 2) * kv(0.25, 0.5 * w ** 2) / norm
+    elif w==0.:
+        return (np.pi**1.5)/(2.*np.sqrt(2.)*gamma(0.75))
     else:
         return 0.25 * np.power(np.pi, 1.5) * np.sqrt(-w) * np.exp(-0.5 * w ** 2) * (iv(-0.25, 0.5 * w ** 2) + iv(0.25, 0.5 * w ** 2)) / norm
 
