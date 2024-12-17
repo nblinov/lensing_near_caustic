@@ -210,8 +210,6 @@ if __name__ == "__main__":
         pkappa = [l**2 / 2 / np.pi * Pkappa_angular(l,params) for l in lPerp]
         pkappa = [1 / 2 / np.pi * Pkappa_angular(l,params) for l in lPerp]
         plt.plot(l_rs_over_DL, pkappa, label = '$c = '+str(c)+'$')
-
-
     #plt.ylim(float(pkappa[0]), 1e-5)
     # #plt.xlim(l_rs_over_DL[0], 1e11)
     plt.axvline(1, color = 'black', ls = '--')
