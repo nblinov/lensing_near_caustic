@@ -1,5 +1,6 @@
 import numpy as np 
 import power_spectrum as ps
+import tqdm
 
 
 def generate_random_field(params, compute_jacobian=False):
@@ -35,8 +36,9 @@ def generate_random_field(params, compute_jacobian=False):
 
     # sqrt amplitude of the angular convergence power spectrum times "volume"; the angular PS should have units rad^2; same units as sqrt(area_in_rad_sq rad^2), e.g. rad^2
     # this sets the magnitude of covergence fluctuations in fourier space; note that the PS units are fixed internally by the PS parameters - that is if we used a different unit for the pixel size, amplitude below would have mixed units
-    # factor of 0.5 because amplitude sets the standard deviations of the real and imaginary parts of the desnity contrast. 
-    amplitude = np.sqrt(params['area_in_rad_sq'] * ps.Pkappa_angular(ell_magnitude,params['ps_params']))
+    #
+    area_in_rad_sq = delta[0]*delta[1]*params['num_pixel']**2
+    amplitude = np.sqrt(area_in_rad_sq * ps.Pkappa_angular(ell_magnitude,params['ps_params']))
 
     #amplitude = np.sqrt(ps.Pkappa_angular(ell_magnitude,params['ps_params'])/params['area_in_rad_sq'])
     #print("Max delta kappa amplitude = ", np.max(amplitude))
@@ -58,7 +60,7 @@ def generate_random_field(params, compute_jacobian=False):
 
 def generate_random_convergence_field(params):
     """
-    Generates a random Gaussian convergence field using a physical clump power spectrum. This function is not used directly to generate lens maps, but rather helps check normalizations of vraious quantities.
+    Generates a random Gaussian convergence field using a physical clump power spectrum. This function is not used directly to generate lens maps, but rather helps check normalizations of various quantities in testing.
     Args:
         params - dictionary with the following keys:
         pixel_size_in_rad - pixel size in the lens plane in radians
@@ -88,22 +90,43 @@ def generate_random_convergence_field(params):
     # sqrt amplitude of the angular convergence power spectrum times "volume"; the angular PS should have units rad^2; same units as sqrt(area_in_rad_sq rad^2), e.g. rad^2
     # this sets the magnitude of covergence fluctuations in fourier space; note that the PS units are fixed internally by the PS parameters - that is if we used a different unit for the pixel size, amplitude below would have mixed units
     # factor of 0.5 because amplitude sets the standard deviations of the real and imaginary parts of the desnity contrast. 
-    amplitude = np.sqrt(params['area_in_rad_sq'] * ps.Pkappa_angular(ell_magnitude,params['ps_params']))
+    area_in_rad_sq = delta[0]*delta[1]*params['num_pixel']**2
+    amplitude = np.sqrt(area_in_rad_sq * ps.Pkappa_angular(ell_magnitude,params['ps_params'])/(delta[0]*delta[1])**2)
 
-    #plt.plot(ell_x_freq, ell_x_freq**2 / 2 /np.pi * ps.Pkappa_angular(ell_x_freq,params['ps_params']),'o')
-    #plt.xscale('log')
-    #plt.yscale('log')
-    #plt.show()
-
+    """
+    # this is a trick to get fourier coefficients that give rise to a real function when inverse transformed
+    white_noise_in_position_space = np.random.normal(size = (size, size))
+    # after normalizing by the white noise PS, fourier coefficients are Gaussian random vars with variance 1
+    noise = np.fft.fft2(white_noise_in_position_space)/np.sqrt(size**2)
+    """
+    # another way to generate the fourier coefficients of a real function is to generate unconstrained fourier coefficients
+    # and then take the real part after the fourier transform
     noise = np.random.normal(size = (size, size)) \
             + 1j * np.random.normal(size = (size, size))
-    noise = np.ones((size,size))
-    # the convergence with units pixel_size^2 (amplitude) /pixel_size^2 (delta^2) = 1, e.g., dimensionless
-    delta_kappa = np.fft.ifft2(noise * amplitude).real/(delta[0]*delta[1]) #* size**2 / params['area_in_rad_sq']
-    delta_kappa = np.fft.ifft2(noise).real/(delta[0]*delta[1]) #* size**2 / params['area_in_rad_sq']
 
 
+    # the field should be real by definition; take real part to get rid of any numerical error-induced imaginary parts
+    delta_kappa = np.fft.ifft2(noise * amplitude).real 
+    """
+    ell_bins = np.linspace(ps.peak_power_ell(params['ps_params'])/10, ps.peak_power_ell(params['ps_params'])*10,50)
+    ell_diff = np.diff(ell_bins)[0]
+    #Pell_est = get_ps_estimate(np.abs(noise)*amplitude*(delta[0]*delta[1]),ell_magnitude, ell_bins, ell_diff, area_in_rad_sq )
+    Pell_est = get_ps_estimate(np.abs(np.fft.fft2(delta_kappa))*(delta[0]*delta[1]),ell_magnitude, ell_bins, ell_diff, area_in_rad_sq )
+    plt.plot(ell_bins,Pell_est * ell_bins**2 / 2 / np.pi)
+    plt.plot(ell_bins,ps.Pkappa_angular(ell_bins,params['ps_params']) * ell_bins**2 / 2 / np.pi, '--')
+    plt.xscale('log')
+    plt.yscale('log')
+    """
     return(delta_kappa)
+
+def get_ps_estimate(dk_fourier,ell_magnitude, ell_bins, ell_diff, domain_volume):
+    # this assumes that dk_fourier are the dimensionful fourier coefficients, only then does the PS has the right dimensions
+    Pell = np.zeros(len(ell_bins))
+    for i, ell in enumerate(ell_bins):
+        match = np.where((ell_magnitude > ell-ell_diff/2) & (ell_magnitude <= ell+ell_diff/2))
+        # The expectation value is < |dk(ell)|^2 > = P(\ell) V, so we need to divide by V 
+        Pell[i] =  np.mean(dk_fourier[match] ** 2)/ domain_volume
+    return(Pell)
 
 if __name__ == '__main__':
 
@@ -111,7 +134,7 @@ if __name__ == '__main__':
 
     num_pixel_lns = 2001 #Number of pixels in lens plane
     half_size_lns = 1e-5 # half size of the lens plane
-    pixel_size_lns = 2.0 * half_size_lns / num_pixel_lns #(num_pixel_lns - 1) # horizontal and vertical physical pixel size
+    pixel_size_lns = 2.0 * half_size_lns / num_pixel_lns # horizontal and vertical physical pixel size
 
     arcmin = np.pi/(180*60.)
     arcsec = np.pi/(180*60.*60.)
@@ -154,43 +177,47 @@ if __name__ == '__main__':
     # Reconstruct the convergence power spectrum from the simlation
     # a la https://nkern.github.io/posts/2024/grfs_and_ffts/
     delta_kappa = generate_random_convergence_field(input_params)
-    delta_kappa_dft = np.abs(np.fft.fft2(delta_kappa)) * input_params['pixel_size_in_rad']**2 # this factor is needed to get delta(ell) 
+    delta_kappa_dft = np.abs(np.fft.fft2(delta_kappa)) * input_params['pixel_size_in_rad']**2 # this factor is needed to get delta(ell) without any prefactors associated with finite box size 
     print(delta_kappa_dft)
+    # For white noise, the PS is V, and < |dk(ell)|^2 > = P(\ell) V = V^2, so dk(ell) ~ V
+    print("Scale of white noise-only fluctuations of fourier modes = ", input_params['area_in_rad_sq'])
     fig, (ax1, ax2) = plt.subplots(figsize=(13, 3), ncols=2)
     dk = ax1.imshow(delta_kappa)
     fig.colorbar(dk)
     ax1.set_title(r"Convergence Fluctuations $\delta\kappa(x)$")
-    dk_dft = ax2.imshow(np.log10(delta_kappa_dft))
+    dk_dft = ax2.imshow(delta_kappa_dft)
     fig.colorbar(dk_dft)
     ax2.set_title(r"Convergence Fluctuations $|\delta\kappa(\ell)|$")
     plt.show()
 
-    ell_x_freq = np.fft.fftshift(2.*np.pi*np.fft.fftfreq(input_params['num_pixel'],d=input_params['pixel_size_in_rad'])).astype(np.float32)
-    ell_y_freq = np.fft.fftshift(2.*np.pi*np.fft.fftfreq(input_params['num_pixel'],d=input_params['pixel_size_in_rad'])).astype(np.float32)
+    ell_x_freq = 2.*np.pi*np.fft.fftfreq(input_params['num_pixel'],d=input_params['pixel_size_in_rad'])
+    ell_y_freq = 2.*np.pi*np.fft.fftfreq(input_params['num_pixel'],d=input_params['pixel_size_in_rad'])
 
     ell_bins = np.linspace(ps.peak_power_ell(ps_params)/10, ps.peak_power_ell(ps_params)*10,50)
-    #ell_bins = np.logspace(np.log10(ps.peak_power_ell(ps_params)/10), np.logo10(ps.peak_power_ell(ps_params)*10,50))
     ell_freq = np.meshgrid(ell_x_freq, ell_y_freq)
     ell_magnitude = np.sqrt(ell_freq[0]**2 + ell_freq[1]**2 + 1e-50)
 
     ell_diff = np.diff(ell_bins)[0]
-    #print(ell_diff)
+    print("dl = ", ell_diff)
     #print(ell_bins)
-    Pell = np.zeros(len(ell_bins))
-    for i, ell in enumerate(ell_bins):
-        match = np.where((ell_magnitude > ell-ell_diff/2) & (ell_magnitude <= ell+ell_diff/2))
-        # The expectation value is < |dk(ell)|^2 > = P(\ell) V, so we need to divide by V 
-        Pell[i] =  np.mean(delta_kappa_dft[match] ** 2)/input_params['area_in_rad_sq']
+    num_realizations = 10
+    Pell_avg = np.zeros(len(ell_bins))
+    for i in tqdm.tqdm(range(num_realizations)):
+        delta_kappa = generate_random_convergence_field(input_params)
+        delta_kappa_dft = np.abs(np.fft.fft2(delta_kappa)) * input_params['pixel_size_in_rad']**2 # this factor is needed to convert the dimensionless DFT coefficient into a Fourier mode delta(ell) with with proper dimensions 
+        Pell_avg += get_ps_estimate(delta_kappa_dft,ell_magnitude, ell_bins, ell_diff, input_params['area_in_rad_sq'])
+    Pell_avg /= num_realizations
 
-    plt.plot(ell_bins, Pell*ell**2 / 2 / np.pi, label='Estimated PS')
-    #plt.plot(ell_bins, Pell, label='Estimated PS')
+    plt.plot(ell_bins, Pell_avg*ell_bins**2 / 2 / np.pi, label='Estimated PS')
     pc_in_km = 3.08568e+13
     Gpc_in_km = 1e9*pc_in_km
     rs = halo_info[0]
-    #Pell_input = [ps.Pkappa_angular(l,ps_params) for l in lPerp]
-    Pell_input = [l**2 / 2 / np.pi * ps.Pkappa_angular(l,ps_params) for l in ell_bins]
-    #plt.plot(ell_bins, Pell_input, '--', label='Input PS')
-    #plt.xscale('log')
+    Pell_input = ps.Pkappa_angular(ell_bins,ps_params)
+    plt.plot(ell_bins, Pell_input*ell_bins**2 / 2 / np.pi, '--', label='Input PS')
+    plt.axvline(x=2.*np.pi/np.sqrt(input_params['area_in_rad_sq']))
+    plt.axvline(x=2.*np.pi/input_params['pixel_size_in_rad'])
+
+    plt.xscale('log')
     plt.yscale('log')
     plt.ylabel(r'$\ell^2 P_\kappa(\ell)/(2\pi)$', fontsize = 20)
     plt.xlabel(r'$\ell$', fontsize = 20)
